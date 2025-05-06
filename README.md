@@ -28,3 +28,11 @@ These kubernetes manifests will create the following:
 kubectl apply -f ./k8s-manifests/.
 ```
 ![Image Description](screenshots/3.png)
+## Configuring Gitlab CI/CD Part
+
+- Creating the image repo in dockerhub
+- Extracting the gitlab runner kubeconfig from the cluster and converting it to base64
+- Creating dockerhub username and password and gitlab rollout kube_config hidden variables in gitlab itself
+![Image Description](screenshots/4.png)
+![Image Description](screenshots/5.png)
+![Image Description](screenshots/6.png)
