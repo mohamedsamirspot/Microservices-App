@@ -32,7 +32,7 @@ deploy-to-k8s:
     - KUBECONFIG=~/.kube/config
     - IMAGE_NAME=mohamedsamirebrahim/microservices-python-image
     - echo $kube_config | base64 -d > $KUBECONFIG
-    - kubectl config use-context my-eks-cluster-gitlab-rollout-manager
+    - kubectl config use-context arn:aws:eks:us-east-1:948763340657:cluster/my-eks-cluster-gitlab-rollout-manager
   script:
     - kubectl config get-contexts
     - kubectl set image deployment/microservices-app -n default microservices-app=$IMAGE_NAME:$CI_PIPELINE_IID
