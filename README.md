@@ -36,3 +36,7 @@ kubectl apply -f ./k8s-manifests/.
 ![Image Description](screenshots/4.png)
 ![Image Description](screenshots/5.png)
 ![Image Description](screenshots/6.png)
+
+## Pipeline
+- as you can see the deployment stage is waiting for manual trigger
+![Image Description](screenshots/7.png)
