@@ -35,7 +35,7 @@ deploy-to-k8s:
     - kubectl config use-context arn:aws:eks:us-east-1:948763340657:cluster/my-eks-cluster-gitlab-rollout-manager
   script:
     - kubectl config get-contexts
-    - kubectl set image deployment/microservices-app -n default microservices-app=$IMAGE_NAME:$CI_PIPELINE_IID
+    - kubectl set image deployment/microservices-app -n default microservices-container=$IMAGE_NAME:$CI_PIPELINE_IID
     - kubectl rollout status deployment/microservices-app -n default
   when: manual
   interruptible: true
