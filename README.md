@@ -1,6 +1,6 @@
 # Microservices Task
 
-Note: Everything is in the same repo, of course it's preferable to separate the infrastructure part to be in another repo, but for simplicity while reviewing the task, everything is in the same repo.
+Note: The Arogcd Manifests Repo: https://gitlab.com/microservices6813119/microservices-k8s-manifests
 
 ## Infrastructure Installation (Terraform)
 
