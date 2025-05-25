@@ -1,5 +1,7 @@
 stages:
   - trivy-dependency-check
+  - owasp-dependency-check
+  - sonarqube-check
   - build-container-image
   - trivy-container-scan
   - push-container-image
@@ -14,6 +16,47 @@ trivy-dependency-check:
     - trivy config . # Scans your project configuration files (like terraform, dockerfile, k8s manifests) (optional but useful).
     - trivy fs --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed .
   allow_failure: true
+  interruptible: true
+  only:
+    - merge_requests
+    - main
+    - dev
+
+############################################ No need for owasp as we already have the trivy dependencies check ############################################ 
+# owasp_dependency_check:
+#   image:
+#     name: registry.gitlab.com/gitlab-ci-utils/docker-dependency-check:latest
+#     entrypoint: [""]
+#   stage: dependency_check
+#   script:
+#     - /usr/share/dependency-check/bin/dependency-check.sh --scan "./" --format ALL --project "$CI_PROJECT_NAME" --enableExperimental
+#   allow_failure: true
+#   interruptible: true
+#   artifacts:
+#     when: always
+#     paths:
+#       - "./dependency-check-report.html"
+#   only:
+#     - merge_requests
+#     - main
+#     - dev
+
+sonarqube-check:
+  stage: sonarqube-check
+  image: 
+    name: sonarsource/sonar-scanner-cli:latest
+    entrypoint: [""]
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
+    GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .sonar/cache
+  script: 
+    - sonar-scanner -Dsonar.projectKey=microservices -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_TOKEN -Dsonar.qualitygate.wait=false -Dsonar.dependencyCheck.htmlReportPath=./dependency-check-report.html -Dsonar.exclusions=**/dependency-check-report.html
+  allow_failure: true
+  interruptible: true
   only:
     - merge_requests
     - main
@@ -37,6 +80,7 @@ build-container-image:
   artifacts:
     paths:
       - image.tar
+  interruptible: true
   only:
     - merge_requests
     - main
@@ -52,6 +96,7 @@ trivy-container-scan:
   dependencies:
     - build-container-image
   allow_failure: true
+  interruptible: true
   only:
     - merge_requests
     - main
@@ -74,6 +119,7 @@ push-container-image:
     - docker push $IMAGE_NAME:$IMAGE_TAG
   dependencies:
     - build-container-image
+  interruptible: true
   rules:
     # Your rules do allow the job to run in merge requests, but only if the source branch is dev or main
     # If on prod branch, require manual action
