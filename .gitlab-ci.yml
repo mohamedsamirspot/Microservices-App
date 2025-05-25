@@ -1,7 +1,21 @@
 stages:
+  - trivy-dependency-check
   - build-push-container-image
   # - deploy-to-k8s
 
+trivy-dependency-check:
+  stage: trivy-dependency-check
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  script:
+    - trivy config .
+    - trivy fs --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed .
+  allow_failure: true  # You can set to false to fail the pipeline on findings
+  only:
+    - merge_requests
+    - main
+    - dev
 
 build-push-container-image:
   stage: build-push-container-image
