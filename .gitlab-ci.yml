@@ -1,6 +1,8 @@
 stages:
   - trivy-dependency-check
-  - build-push-container-image
+  - build-container-image
+  - trivy-container-scan
+  - push-container-image
   # - deploy-to-k8s
 
 trivy-dependency-check:
@@ -9,16 +11,16 @@ trivy-dependency-check:
     name: aquasec/trivy:latest
     entrypoint: [""]
   script:
-    - trivy config .
+    - trivy config . # Scans your project configuration files (like terraform, dockerfile, k8s manifests) (optional but useful).
     - trivy fs --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed .
-  allow_failure: true  # You can set to false to fail the pipeline on findings
+  allow_failure: true
   only:
     - merge_requests
     - main
     - dev
 
-build-push-container-image:
-  stage: build-push-container-image
+build-container-image:
+  stage: build-container-image
   image: docker:latest
   services:
     - docker:dind
@@ -31,8 +33,47 @@ build-push-container-image:
     - echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
   script:
     - docker build --no-cache -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest .
+    - docker save $IMAGE_NAME:$IMAGE_TAG -o image.tar  # Save image for scan
+  artifacts:
+    paths:
+      - image.tar
+  only:
+    - merge_requests
+    - main
+    - dev
+
+trivy-container-scan:
+  stage: trivy-container-scan
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  script:
+    - trivy image --input image.tar --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed
+  dependencies:
+    - build-container-image
+  allow_failure: true
+  only:
+    - merge_requests
+    - main
+    - dev
+
+push-container-image:
+  stage: push-container-image
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_DRIVER: overlay2
+    IMAGE_NAME: mohamedsamirebrahim/microservices-python-image
+    DOCKER_TLS_CERTDIR: ""
+    IMAGE_TAG: "${CI_COMMIT_REF_NAME}-${CI_PIPELINE_IID}"
+  before_script:
+    - echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+  script:
+    - docker load -i image.tar  # Load previously saved image
     - docker push $IMAGE_NAME:$IMAGE_TAG
-  interruptible: true
+  dependencies:
+    - build-container-image
   when: manual
   only:
     - merge_requests
