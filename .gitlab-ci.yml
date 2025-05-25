@@ -74,11 +74,17 @@ push-container-image:
     - docker push $IMAGE_NAME:$IMAGE_TAG
   dependencies:
     - build-container-image
-  when: manual
-  only:
-    - merge_requests
-    - main
-    - dev
+
+  rules:
+    # If on prod branch, require manual action
+    - if: '$CI_COMMIT_REF_NAME == "prod"'
+      when: manual
+    # If on dev branch, run automatically as soon as dependencies succeed
+    - if: '$CI_COMMIT_REF_NAME == "dev"'
+      when: on_success
+    # Fallback: don't run on any other branch
+    - when: never
+
 
 
 
