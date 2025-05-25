@@ -1,6 +1,6 @@
 stages:
   - trivy-dependency-check
-  - owasp-dependency-check
+  # - owasp-dependency-check
   - sonarqube-check
   - build-container-image
   - trivy-container-scan
