@@ -74,8 +74,8 @@ push-container-image:
     - docker push $IMAGE_NAME:$IMAGE_TAG
   dependencies:
     - build-container-image
-
   rules:
+    # Your rules do allow the job to run in merge requests, but only if the source branch is dev or main
     # If on prod branch, require manual action
     - if: '$CI_COMMIT_REF_NAME == "main"'
       when: manual
