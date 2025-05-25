@@ -77,7 +77,7 @@ push-container-image:
 
   rules:
     # If on prod branch, require manual action
-    - if: '$CI_COMMIT_REF_NAME == "dev"'
+    - if: '$CI_COMMIT_REF_NAME == "main"'
       when: manual
     # If on dev branch, run automatically as soon as dependencies succeed
     - if: '$CI_COMMIT_REF_NAME == "dev"'
