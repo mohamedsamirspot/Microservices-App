@@ -1,21 +1,9 @@
 # Microservices Task
 
-Note: The Arogcd Manifests Repo: https://gitlab.com/microservices6813119/microservices-k8s-manifests
+Note: 
+- The Arogcd Manifests Repo: https://gitlab.com/microservices6813119/microservices-k8s-manifests
+- The Infrastructure (terraform) Repo: https://gitlab.com/microservices6813119/microservices-infrastructure
 
-## Infrastructure Installation (Terraform)
-
-Running the terraform manifests that will create the following components in aws (terraform will use my aws credentials from my local creds)
-- vpc
-- subnets
-- eks cluster with karpenter (optional usage) restricted from my ip only
-
-```bash
-terraform init
-terraform apply
-aws eks --region us-east-1 update-kubeconfig --name my-eks-cluster
-```
-![Image Description](screenshots/1.png)
-![Image Description](screenshots/2.png)
 
 ## Applying K8s Manifests
 
@@ -31,12 +19,5 @@ kubectl apply -f ./k8s-manifests/.
 ## Configuring Gitlab CI/CD Part
 
 - Creating the image repo in dockerhub
-- Extracting the gitlab runner kubeconfig from the cluster and converting it to base64
-- Creating dockerhub username and password and gitlab rollout kube_config hidden variables in gitlab itself
+- Connecting our cluster with our argocd for gitops https://gitlab.com/microservices6813119/microservices-k8s-manifests
 ![Image Description](screenshots/4.png)
-![Image Description](screenshots/5.png)
-![Image Description](screenshots/6.png)
-
-## Pipeline
-- as you can see the deployment stage is waiting for manual trigger
-![Image Description](screenshots/7.png)
