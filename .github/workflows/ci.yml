@@ -26,9 +26,9 @@ on:
     types: [ release-created ]
   workflow_dispatch:
   push:
-    branches: [ dev ]
+    branches: [ dev, test ]
   pull_request:
-    branches: [ main, dev ]
+    branches: [ main, dev, test ]
 
 env:
   IMAGE_NAME: mohamedsamirebrahim/microservices-python-image
@@ -139,14 +139,20 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Determine tag or dev version
+      - name: Determine Docker image tag
         id: version
         run: |
           if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            # Release triggered by release-tag workflow → semantic tag
             echo "TAG=${{ github.event.client_payload.tag }}" >> $GITHUB_OUTPUT
           else
-            echo "TAG=dev-${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
+            # All other branches → dynamic branch-based tag
+            BRANCH_NAME=${GITHUB_REF##*/}
+            echo "TAG=${BRANCH_NAME}-${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
           fi
+
+
+          
 
       - name: Push image
         run: |
