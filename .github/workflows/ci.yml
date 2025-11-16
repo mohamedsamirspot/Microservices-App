@@ -96,7 +96,7 @@ jobs:
           docker build -t $IMAGE_NAME:${{ steps.version.outputs.TAG }} -t $IMAGE_NAME:latest .
 
       - name: Save image
-        run: docker save $IMAGE_NAME:${{ steps.tag.outputs.tag }} -o image.tar
+        run: docker save $IMAGE_NAME:${{ steps.version.outputs.TAG }} -o image.tar
 
       - name: Upload TAR artifact
         uses: actions/upload-artifact@v4
