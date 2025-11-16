@@ -43,7 +43,7 @@ jobs:
 
       - name: Trigger CI workflow
         if: steps.tag_version.outputs.new_tag != ''
-        uses: peter-evans/workflow-dispatch@v2
+        uses: peter-evans/workflow-dispatch@v4
         with:
           workflow: CI Pipeline.yml
           ref: main
