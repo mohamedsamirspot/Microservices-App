@@ -141,13 +141,13 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Determine image tag
-        id: tag
+      - name: Determine tag or dev version
+        id: version
         run: |
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            echo "tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            echo "TAG=${{ github.event.client_payload.tag }}" >> $GITHUB_OUTPUT
           else
-            echo "tag=dev-${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
+            echo "TAG=dev-${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
           fi
 
       - name: Push image
