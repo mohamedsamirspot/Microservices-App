@@ -1,6 +1,7 @@
 # name: CI Pipeline
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main, dev ]
   pull_request:
@@ -59,23 +60,13 @@ jobs:
       IMAGE_TAG: ${{ github.ref_name }}-${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-
       - name: Build image
         run: |
           docker build --no-cache -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest .
-
       - name: Save image as TAR
         run: docker save $IMAGE_NAME:$IMAGE_TAG -o image.tar
-
       - name: Upload TAR artifact
         uses: actions/upload-artifact@v4
         with:
@@ -98,3 +89,29 @@ jobs:
           scan-type: image
           severity: HIGH,CRITICAL
           ignore-unfixed: true
+
+  push-container-image:
+    runs-on: ubuntu-latest
+    needs: trivy-container-scan
+    if: >
+      github.ref_name == 'dev' ||
+      (github.ref_name == 'main' && github.event_name == 'workflow_dispatch')
+    env:
+      IMAGE_TAG: ${{ github.ref_name }}-${{ github.run_number }}
+    steps:
+      - name: Download image TAR
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+
+      - name: Load image
+        run: docker load -i image.tar
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Push image
+        run: docker push $IMAGE_NAME:$IMAGE_TAG
