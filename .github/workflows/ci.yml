@@ -7,18 +7,17 @@
 
 # ✔ Push events = accepted code → OK to build & publish images
 # ❌ PR events = proposed code → run checks only, no publishing
-# | Event                                                               | Triggers **Release-Tag Workflow** | Triggers **CI Workflow** | Notes                                                  |
-# | ------------------------------------------------------------------- | --------------------------------- | ------------------------ | ------------------------------------------------------ |
-# | **Push to `dev` branch**                                            | ❌ No                              | ✅ Yes                    | Builds & scans **dev images** → `dev-123`              |
+# | Event                                                               | Triggers **Release-Tag Workflow**  | Triggers **CI Workflow** | Notes                                                  |
+# | ------------------------------------------------------------------- | ---------------------------------  | ------------------------ | ------------------------------------------------------ |
+# | **Push to `dev, test` branch**                                      | ❌ No                              | ✅ Yes                    | Builds & scans **dev images** → `dev-123`              |
 # | **Push to `main` branch**                                           | ✅ Yes                             | ❌ No                     | Release workflow bumps version & creates tag           |
-# | **Pull request into `dev`**                                         | ❌ No                              | ⚠️ Yes (CI only)         | Runs tests/scans; **no images pushed**                 |
+# | **Pull request into `dev, test`**                                   | ❌ No                              | ⚠️ Yes (CI only)         | Runs tests/scans; **no images pushed**                 |
 # | **Pull request into `main`**                                        | ❌ No                              | ⚠️ Yes (CI only)         | Allows validation before merging; **no images pushed** |
 # | **Merge into `main`**                                               | ✅ Yes                             | ❌ No                     | Release workflow creates Git tag (`vX.Y.Z`)            |
 # | **Git tag pushed (vX.Y.Z)**                                         | ❌ No                              | ✅ Yes                    | Builds **production image** → `vX.Y.Z`, `latest`       |
 # | **Manual run (workflow_dispatch)**                                  | ❌ No                              | ✅ Yes                    | Manually run full CI pipeline                          |
 # | **Push to any other branch (feature/* etc.)**                       | ❌ No                              | ❌ No                     | CI is not triggered unless configured                  |
-# | **Automatic tag created by release workflow "only in main branch"** | (This workflow creates it)        | ✅ Yes                    | CI runs on tags created by release workflow            |
-
+# | **Automatic tag created by release workflow "only in main branch"** | (This workflow creates it)          | ✅ Yes                    | CI runs on tags created by release workflow            |
 
 
 on:
@@ -76,10 +75,8 @@ jobs:
     needs: sonarqube-check
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Determine Docker image tag
         id: version
         run: |
@@ -91,14 +88,11 @@ jobs:
             BRANCH_NAME=${GITHUB_REF##*/}
             echo "TAG=${BRANCH_NAME}-${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
           fi
-
       - name: Build Docker image
         run: |
           docker build -t $IMAGE_NAME:${{ steps.version.outputs.TAG }} .
-
       - name: Save image
         run: docker save $IMAGE_NAME:${{ steps.version.outputs.TAG }} -o image.tar
-
       - name: Upload TAR artifact
         uses: actions/upload-artifact@v4
         with:
@@ -132,16 +126,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: docker-image
-
       - name: Load image
         run: docker load -i image.tar
-
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
-
       - name: Determine Docker image tag
         id: version
         run: |
@@ -153,10 +144,6 @@ jobs:
             BRANCH_NAME=${GITHUB_REF##*/}
             echo "TAG=${BRANCH_NAME}-${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
           fi
-
-
-          
-
       - name: Push image
         run: |
           docker push $IMAGE_NAME:${{ steps.version.outputs.TAG }}
