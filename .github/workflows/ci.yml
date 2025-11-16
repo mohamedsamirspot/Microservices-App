@@ -93,7 +93,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t $IMAGE_NAME:${{ steps.version.outputs.TAG }} -t $IMAGE_NAME:latest .
+          docker build -t $IMAGE_NAME:${{ steps.version.outputs.TAG }} .
 
       - name: Save image
         run: docker save $IMAGE_NAME:${{ steps.version.outputs.TAG }} -o image.tar
@@ -153,6 +153,3 @@ jobs:
       - name: Push image
         run: |
           docker push $IMAGE_NAME:${{ steps.version.outputs.TAG }}
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            docker push $IMAGE_NAME:latest
-          fi
