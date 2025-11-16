@@ -1,5 +1,5 @@
 # If SonarQube results are a gate to image building, keep your stages ordering.
-# If security scanning is a higher priority, consider scanning the image right after building then put the sonarqube check after iamge scanning.
+# If security scanning is a higher priority, consider scanning the image right after building then put the sonarqube check after image scanning.
 stages:
   - trivy-dependency-check
   # - owasp-dependency-check
