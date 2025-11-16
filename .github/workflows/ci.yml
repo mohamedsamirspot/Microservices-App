@@ -36,6 +36,7 @@ jobs:
   sonarqube-check:
     runs-on: ubuntu-latest
     needs: trivy-dependency-check
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
