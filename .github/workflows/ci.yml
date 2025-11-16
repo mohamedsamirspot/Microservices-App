@@ -29,10 +29,6 @@ on:
       - 'v*.*.*'
   pull_request:
     branches: [ main, dev ]
-  workflow_run:        # <-- NEW: triggers CI after release workflow completes
-    workflows: ["Release Tagging"]  # exact name of your release workflow
-    types:
-      - completed
 
 env:
   IMAGE_NAME: mohamedsamirebrahim/microservices-python-image

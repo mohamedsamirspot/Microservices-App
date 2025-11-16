@@ -40,3 +40,12 @@ jobs:
             Changes included in this release are based on the commits in the `main` branch.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Trigger CI workflow
+        if: steps.tag_version.outputs.new_tag != ''
+        uses: peter-evans/workflow-dispatch@v2
+        with:
+          workflow: CI Pipeline.yml        # exact name of your CI workflow file
+          ref: main
+          inputs:
+            tag: ${{ steps.tag_version.outputs.new_tag }}
