@@ -45,7 +45,8 @@ jobs:
         if: steps.tag_version.outputs.new_tag != ''
         uses: peter-evans/workflow-dispatch@v2
         with:
-          workflow: ci.yml
+          workflow: CI Pipeline.yml
           ref: main
           inputs: |
             tag: "${{ steps.tag_version.outputs.new_tag }}"
+
