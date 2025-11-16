@@ -152,7 +152,7 @@ jobs:
 
       - name: Push image
         run: |
-          docker push $IMAGE_NAME:${{ steps.tag.outputs.tag }}
+          docker push $IMAGE_NAME:${{ steps.version.outputs.TAG }}
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             docker push $IMAGE_NAME:latest
           fi
