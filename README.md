@@ -14,5 +14,11 @@ This CICD Pipeline does the following:
 - trivy-container-scan
 - push-container-image to docker hub
 
-![Image Description](screenshots/4.png)
+### Gitlab
+![Image Description](screenshots/1.png)
+### Github Actions
+![Image Description](screenshots/2.png)
+### Dockerhub
 ![Image Description](screenshots/3.png)
+### App
+![Image Description](screenshots/4.png)

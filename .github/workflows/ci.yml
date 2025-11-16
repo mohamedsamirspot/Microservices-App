@@ -1,9 +1,32 @@
 # name: CI Pipeline
 
+
+# If SonarQube results are a gate to image building, keep your stages ordering.
+# If security scanning is a higher priority, consider scanning the image right after building then put the sonarqube check after image scanning.
+
+
+# ✔ Push events = accepted code → OK to build & publish images
+# ❌ PR events = proposed code → run checks only, no publishing
+# | Event                                         | Triggers **Release-Tag Workflow** | Triggers **CI Workflow** | Notes                                                  |
+# | --------------------------------------------- | --------------------------------- | ------------------------ | ------------------------------------------------------ |
+# | **Push to `dev` branch**                      | ❌ No                              | ✅ Yes                    | Builds & scans **dev images** → `dev-123`              |
+# | **Push to `main` branch**                     | ✅ Yes                             | ❌ No                     | Release workflow bumps version & creates tag           |
+# | **Pull request into `dev`**                   | ❌ No                              | ⚠️ Yes (CI only)         | Runs tests/scans; **no images pushed**                 |
+# | **Pull request into `main`**                  | ❌ No                              | ⚠️ Yes (CI only)         | Allows validation before merging; **no images pushed** |
+# | **Merge into `main`**                         | ✅ Yes                             | ❌ No                     | Release workflow creates Git tag (`vX.Y.Z`)            |
+# | **Git tag pushed (vX.Y.Z)**                   | ❌ No                              | ✅ Yes                    | Builds **production image** → `vX.Y.Z`, `latest`       |
+# | **Manual run (workflow_dispatch)**            | ❌ No                              | ✅ Yes                    | Manually run full CI pipeline                          |
+# | **Push to any other branch (feature/* etc.)** | ❌ No                              | ❌ No                     | CI is not triggered unless configured                  |
+# | **Automatic tag created by release workflow** | (This workflow creates it)        | ✅ Yes                    | CI runs on tags created by release workflow            |
+
+
+
 on:
   workflow_dispatch:
   push:
-    branches: [ main, dev ]
+    branches: [ dev ]
+    tags:
+      - 'v*.*.*'
   pull_request:
     branches: [ main, dev ]
 
@@ -11,13 +34,11 @@ env:
   IMAGE_NAME: mohamedsamirebrahim/microservices-python-image
 
 jobs:
-
   trivy-dependency-check:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       # Scans your project configuration files (like terraform, dockerfile, k8s manifests) (optional but useful).
       - name: Run Trivy Config Scan
         uses: aquasecurity/trivy-action@master
@@ -25,7 +46,6 @@ jobs:
           scan-type: config
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-
       - name: Run Trivy FS Scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -33,14 +53,13 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
 
-          
+
   sonarqube-check:
     runs-on: ubuntu-latest
     needs: trivy-dependency-check
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v2
         with:
@@ -51,27 +70,38 @@ jobs:
             -Dsonar.qualitygate.wait=false
             -Dsonar.exclusions=**/dependency-check-report.html
 
-            
 
   build-container-image:
     runs-on: ubuntu-latest
     needs: sonarqube-check
-    env:
-      IMAGE_TAG: ${{ github.ref_name }}-${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Determine image tag
+        id: tag
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            echo "tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=dev-${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build image
         run: |
-          docker build --no-cache -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest .
-      - name: Save image as TAR
-        run: docker save $IMAGE_NAME:$IMAGE_TAG -o image.tar
+          docker build --no-cache -t $IMAGE_NAME:${{ steps.tag.outputs.tag }} -t $IMAGE_NAME:latest .
+
+      - name: Save image
+        run: docker save $IMAGE_NAME:${{ steps.tag.outputs.tag }} -o image.tar
+
       - name: Upload TAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: docker-image
           path: image.tar
+
 
   trivy-container-scan:
     runs-on: ubuntu-latest
@@ -90,14 +120,10 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
 
+
   push-container-image:
     runs-on: ubuntu-latest
     needs: trivy-container-scan
-    if: >
-      github.ref_name == 'dev' ||
-      (github.ref_name == 'main' && github.event_name == 'workflow_dispatch')
-    env:
-      IMAGE_TAG: ${{ github.ref_name }}-${{ github.run_number }}
     steps:
       - name: Download image TAR
         uses: actions/download-artifact@v4
@@ -113,5 +139,18 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
+      - name: Determine image tag
+        id: tag
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            echo "tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=dev-${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Push image
-        run: docker push $IMAGE_NAME:$IMAGE_TAG
+        run: |
+          docker push $IMAGE_NAME:${{ steps.tag.outputs.tag }}
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            docker push $IMAGE_NAME:latest
+          fi
