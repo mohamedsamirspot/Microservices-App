@@ -80,13 +80,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Determine tag or dev version
+      - name: Determine Docker image tag
         id: version
         run: |
           if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            # Release triggered by release-tag workflow → semantic tag
             echo "TAG=${{ github.event.client_payload.tag }}" >> $GITHUB_OUTPUT
           else
-            echo "TAG=dev-${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
+            # All other branches → dynamic branch-based tag
+            BRANCH_NAME=${GITHUB_REF##*/}
+            echo "TAG=${BRANCH_NAME}-${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
           fi
 
       - name: Build Docker image
