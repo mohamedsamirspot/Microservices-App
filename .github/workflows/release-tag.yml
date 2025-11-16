@@ -41,12 +41,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Trigger CI workflow
+      - name: Trigger CI via repository dispatch
         if: steps.tag_version.outputs.new_tag != ''
-        uses: peter-evans/workflow-dispatch@v4
+        uses: peter-evans/repository-dispatch@v4
         with:
-          workflow: CI Pipeline.yml
-          ref: main
-          inputs: |
-            tag: "${{ steps.tag_version.outputs.new_tag }}"
-
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: release-created
+          client-payload: |
+            {
+              "tag": "${{ steps.tag_version.outputs.new_tag }}"
+            }
