@@ -10,7 +10,7 @@ jobs:
       contents: write  # required for tagging and creating releases
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       # Include the token #major, #minor, #patch, or #none somewhere in the commit message of the merge commit or the relevant commit. Example: "feat: rewrite API endpoint to new microservice architecture #major"
