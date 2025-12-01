@@ -60,7 +60,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v2
+        uses: SonarSource/sonarqube-scan-action@v6
         with:
           args: >
             -Dsonar.projectKey=microservices
