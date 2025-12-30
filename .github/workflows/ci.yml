@@ -1,4 +1,4 @@
-# name: CI Pipeline
+name: ci
 
 
 # If SonarQube results are a gate to image building, keep your stages ordering.

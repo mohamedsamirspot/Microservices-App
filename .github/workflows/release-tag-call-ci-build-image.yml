@@ -1,3 +1,5 @@
+name: release-tag-call-ci-build-image
+
 on:
   push:
     branches:
