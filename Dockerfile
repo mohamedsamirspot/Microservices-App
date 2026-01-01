@@ -13,6 +13,8 @@ RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY . .
 
+RUN chown -R appuser:appuser /app
+
 # Switch to non-root user
 USER appuser
 
@@ -20,4 +22,4 @@ USER appuser
 EXPOSE 5000
 
 # Run the application
-CMD ["python", "run.py"]
+CMD ["python", "-u", "run.py"]
