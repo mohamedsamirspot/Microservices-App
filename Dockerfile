@@ -1,22 +1,21 @@
 FROM python:3.14-slim
 
+# Create non-root user with fixed UID/GID
+RUN groupadd -g 1001 appuser \
+    && useradd -u 1001 -g 1001 -m appuser
+
 # Set work directory
 WORKDIR /app
-
-# Create non-root user
-RUN useradd -m appuser
 
 # Install dependencies
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
-# Copy project
-COPY . .
-
-RUN chown -R appuser:appuser /app
+# Copy application files with correct ownership
+COPY --chown=1001:1001 . .
 
 # Switch to non-root user
-USER appuser
+USER 1001:1001
 
 # Expose the port the app runs on
 EXPOSE 5000
