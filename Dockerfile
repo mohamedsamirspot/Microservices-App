@@ -2,7 +2,7 @@ FROM python:3.14-slim
 
 # Create non-root user with fixed UID/GID
 RUN groupadd -g 1001 appuser \
-    && useradd -u 1001 -g 1001 -m appuser
+    && useradd -u 1001 -g 1001 -m microservices-user
 
 # Set work directory
 WORKDIR /app
@@ -15,7 +15,7 @@ RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 COPY --chown=1001:1001 . .
 
 # Switch to non-root user
-USER 1001:1001
+USER microservices-user
 
 # Expose the port the app runs on
 EXPOSE 5000
