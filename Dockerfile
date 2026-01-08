@@ -1,7 +1,7 @@
 FROM python:3.14-slim
 
 # Create non-root user with fixed UID/GID
-RUN groupadd -g 1001 appuser \
+RUN groupadd -g 1001 microservices-user \
     && useradd -u 1001 -g 1001 -m microservices-user
 
 # Set work directory
