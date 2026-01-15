@@ -29,6 +29,11 @@ on:
   pull_request:
     branches: [ main, dev, test ]
 
+concurrency:
+  group: ci-group
+  # the default is wait
+  cancel-in-progress: false
+
 env:
   IMAGE_NAME: mohamedsamirebrahim/microservices-python-image
 
