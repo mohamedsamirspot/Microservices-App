@@ -10,9 +10,9 @@ This CICD Pipeline does the following:
 - trivy-dependency-check
 - owasp-dependency-check (optional)
 - sonarqube-check
-- build-container-image
-- trivy-container-scan
+- build-and-trivy-scan-container-image
 - push-container-image to docker hub
+- Optional: build in multiarch (amd and arm)
 ![Image Description](screenshots/1.jpg)
 
 ### Gitlab
