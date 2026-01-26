@@ -97,8 +97,6 @@ jobs:
       - name: Build Docker image
         run: |
           docker build -t $IMAGE_NAME:${{ steps.version.outputs.TAG }} .
-      - name: Save image
-        run: docker save $IMAGE_NAME:${{ steps.version.outputs.TAG }} -o image.tar
       - name: Scan Image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
@@ -106,6 +104,8 @@ jobs:
           scan-type: image
           severity: HIGH,CRITICAL
           ignore-unfixed: true
+      - name: Save image
+        run: docker save $IMAGE_NAME:${{ steps.version.outputs.TAG }} -o image.tar
       - name: Upload TAR artifact
         uses: actions/upload-artifact@v6
         with:
