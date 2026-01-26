@@ -75,7 +75,7 @@ jobs:
             -Dsonar.exclusions=**/dependency-check-report.html
 
 
-  build-container-image:
+  build-and-trivy-scan-container-image:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     needs: sonarqube-check
@@ -99,6 +99,13 @@ jobs:
           docker build -t $IMAGE_NAME:${{ steps.version.outputs.TAG }} .
       - name: Save image
         run: docker save $IMAGE_NAME:${{ steps.version.outputs.TAG }} -o image.tar
+      - name: Scan Image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: $IMAGE_NAME:${{ steps.version.outputs.TAG }}
+          scan-type: image
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
       - name: Upload TAR artifact
         uses: actions/upload-artifact@v6
         with:
@@ -106,29 +113,10 @@ jobs:
           path: image.tar
 
 
-  trivy-container-scan:
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    needs: build-container-image
-    steps:
-      - name: Download image TAR
-        uses: actions/download-artifact@v7
-        with:
-          name: docker-image
-
-      - name: Scan Image with Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          input: image.tar
-          scan-type: image
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-
-
   push-container-image:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    needs: trivy-container-scan
+    needs: build-and-trivy-scan-container-image
     steps:
       - name: Download image TAR
         uses: actions/download-artifact@v7
@@ -155,3 +143,110 @@ jobs:
       - name: Push image
         run: |
           docker push $IMAGE_NAME:${{ steps.version.outputs.TAG }}
+
+#------------------ Multi-Arch Docker Buildx Reference ------------------#
+# Docker does not support saving a multi-arch image as a single TAR and re-loading it later so you have to build again in the push step.
+  # build-and-trivy-scan-container-images:
+  #   if: github.event_name != 'pull_request'
+  #   runs-on: ubuntu-latest
+  #   needs: sonarqube-check
+  #   steps:
+  #     - uses: actions/checkout@v6
+
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+
+  #     - name: Determine Docker image tag
+  #       id: version
+  #       run: |
+  #         if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+  #           echo "TAG=${{ github.event.client_payload.tag }}" >> $GITHUB_OUTPUT
+  #         else
+  #           BRANCH_NAME=${GITHUB_REF##*/}
+  #           echo "TAG=${BRANCH_NAME}-${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
+  #         fi
+  #     # ---------------- amd64 ----------------
+  #     - name: Build amd64 image (OCI)
+  #       run: |
+  #         docker buildx build \
+  #           --platform linux/amd64 \
+  #           -t $IMAGE_NAME:${{ steps.version.outputs.TAG }}-amd64 \
+  #           --cache-from type=gha \
+  #           --cache-to type=gha,mode=max \
+  #           --output type=oci,dest=image-amd64.tar \
+  #           .
+  #     - name: Extract amd64 image
+  #       run: |
+  #         mkdir image-amd64
+  #         tar -xf image-amd64.tar -C image-amd64
+  #     - name: Show amd64 platform metadata
+  #       run: |
+  #         jq '.manifests[0].platform' image-amd64/index.json
+  #     - name: Scan amd64 image with Trivy
+  #       uses: aquasecurity/trivy-action@master
+  #       with:
+  #         scan-type: image
+  #         input: image-amd64
+  #         severity: HIGH,CRITICAL
+  #         ignore-unfixed: true
+  #     # ---------------- arm64 ----------------
+  #     - name: Build arm64 image (OCI)
+  #       run: |
+  #         docker buildx build \
+  #           --platform linux/arm64 \
+  #           -t $IMAGE_NAME:${{ steps.version.outputs.TAG }}-arm64 \
+  #           --cache-from type=gha \
+  #           --cache-to type=gha,mode=max \
+  #           --output type=oci,dest=image-arm64.tar \
+  #           .
+  #     - name: Extract arm64 image
+  #       run: |
+  #         mkdir image-arm64
+  #         tar -xf image-arm64.tar -C image-arm64
+  #     - name: Show arm64 platform metadata
+  #       run: |
+  #         jq '.manifests[0].platform' image-arm64/index.json
+  #     - name: Scan arm64 image with Trivy
+  #       uses: aquasecurity/trivy-action@master
+  #       with:
+  #         scan-type: image
+  #         input: image-arm64
+  #         severity: HIGH,CRITICAL
+  #         ignore-unfixed: true
+
+
+  # push-container-image:
+  #   if: github.event_name != 'pull_request'
+  #   runs-on: ubuntu-latest
+  #   needs: build-and-trivy-scan-container-images
+  #   steps:
+  #     - uses: actions/checkout@v6
+
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+
+  #     - name: Login to DockerHub
+  #       uses: docker/login-action@v3
+  #       with:
+  #         username: ${{ vars.DOCKERHUB_USERNAME }}
+  #         password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+  #     - name: Determine Docker image tag
+  #       id: version
+  #       run: |
+  #         if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+  #           echo "TAG=${{ github.event.client_payload.tag }}" >> $GITHUB_OUTPUT
+  #         else
+  #           BRANCH_NAME=${GITHUB_REF##*/}
+  #           echo "TAG=${BRANCH_NAME}-${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
+  #         fi
+
+  #     - name: Build & push multi-arch image
+  #       run: |
+  #         docker buildx build \
+  #           --platform linux/amd64,linux/arm64 \
+  #           -t $IMAGE_NAME:${{ steps.version.outputs.TAG }} \
+  #           --cache-from type=gha \
+  #           --cache-to type=gha,mode=max \
+  #           --push \
+  #           .
