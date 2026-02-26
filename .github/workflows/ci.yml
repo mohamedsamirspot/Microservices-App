@@ -107,7 +107,7 @@ jobs:
       - name: Save image
         run: docker save $IMAGE_NAME:${{ steps.version.outputs.TAG }} -o image.tar
       - name: Upload TAR artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: docker-image
           path: image.tar
@@ -119,7 +119,7 @@ jobs:
     needs: build-and-trivy-scan-container-image
     steps:
       - name: Download image TAR
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: docker-image
       - name: Load image
