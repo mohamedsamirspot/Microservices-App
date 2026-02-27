@@ -38,6 +38,7 @@ env:
   IMAGE_NAME: mohamedsamirebrahim/microservices-python-image
 
 jobs:
+  #SCA: Strengthen with Snyk or pip-audit if you can: Trivy FS is good but adding a Python-specific tool catches more
   trivy-dependency-check:
     runs-on: ubuntu-latest
     steps:
@@ -57,7 +58,7 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
 
-
+  #SAST: Add Bandit (Python-specific) if you can: SonarQube is broad; Bandit is purpose-built for Python security issues (SQL injection, hardcoded secrets, unsafe deserialization, etc.):
   sonarqube-check:
     runs-on: ubuntu-latest
     needs: trivy-dependency-check
@@ -74,7 +75,7 @@ jobs:
             -Dsonar.qualitygate.wait=false
             -Dsonar.exclusions=**/dependency-check-report.html
 
-
+  #SCA
   build-and-trivy-scan-container-image:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
@@ -112,6 +113,48 @@ jobs:
           name: docker-image
           path: image.tar
 
+  #DAST
+  dast-zap:
+      runs-on: ubuntu-latest
+      needs: build-and-trivy-scan-container-image
+      if: github.event_name != 'pull_request'
+      steps:
+        - uses: actions/checkout@v6
+
+        - name: Download image TAR
+          uses: actions/download-artifact@v8
+          with:
+            name: docker-image
+
+        - name: Load image
+          run: docker load -i image.tar
+
+        - name: Determine Docker image tag
+          id: version
+          run: |
+            if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+              echo "TAG=${{ github.event.client_payload.tag }}" >> $GITHUB_OUTPUT
+            else
+              BRANCH_NAME=${GITHUB_REF##*/}
+              echo "TAG=${BRANCH_NAME}-${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
+            fi
+
+        - name: Run Flask app
+          run: |
+            docker run -d --name flask-app -p 5000:5000 \
+              ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.TAG }}
+            sleep 10  # wait for app to be ready
+
+        - name: Run OWASP ZAP Baseline Scan
+          uses: zaproxy/action-baseline@v0.12.0
+          with:
+            target: 'http://localhost:5000'
+            fail_action: false   # set true to break pipeline on findings
+            artifact_name: zap-report
+
+        - name: Stop Flask app
+          if: always()
+          run: docker stop flask-app && docker rm flask-app
 
   push-container-image:
     if: github.event_name != 'pull_request'
@@ -146,6 +189,7 @@ jobs:
 
 #------------------ Multi-Arch Docker Buildx Reference ------------------#
 # Docker does not support saving a multi-arch image as a single TAR and re-loading it later so you have to build again in the push step.
+  ##SCA
   # build-and-trivy-scan-container-images:
   #   if: github.event_name != 'pull_request'
   #   runs-on: ubuntu-latest
