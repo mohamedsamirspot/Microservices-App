@@ -158,16 +158,20 @@ jobs:
           uses: zaproxy/action-baseline@v0.12.0
           with:
             target: 'http://localhost:5000/products'
-            fail_action: false # set true to break pipeline on findings
-            artifact_name: zap-report-products
-            issue_title: ""   # disables auto issue creation
+            fail_action: false
+            artifact_name: zap-report-products # set true to break pipeline on findings
+            issue_title: "" # disables auto issue creation
+            cmd_options: '-J products_report.json -w products_report.md -r products_report.html'
+        - name: Fix workspace permissions for ZAP (second scan)
+          run: chmod a+w ${{ github.workspace }}
         - name: Run ZAP Scan on /users
           uses: zaproxy/action-baseline@v0.12.0
           with:
             target: 'http://localhost:5000/users'
-            fail_action: false # set true to break pipeline on findings
-            artifact_name: zap-report-users
-            issue_title: ""   # disables auto issue creation
+            fail_action: false
+            artifact_name: zap-report-users # set true to break pipeline on findings
+            issue_title: "" # disables auto issue creation
+            cmd_options: '-J users_report.json -w users_report.md -r users_report.html' 
         - name: Stop Flask app
           if: always()
           run: docker stop flask-app && docker rm flask-app
