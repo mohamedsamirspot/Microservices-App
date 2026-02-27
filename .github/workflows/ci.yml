@@ -159,7 +159,6 @@ jobs:
           with:
             target: 'http://localhost:5000/products'
             fail_action: false
-            artifact_name: zapreportproducts # set true to break pipeline on findings
             allow_issue_writing: false # disables auto issue creation
         - name: Fix workspace permissions for ZAP (second scan)
           run: chmod a+w ${{ github.workspace }}
@@ -168,7 +167,6 @@ jobs:
           with:
             target: 'http://localhost:5000/users'
             fail_action: false
-            artifact_name: zapreportusers # set true to break pipeline on findings
             allow_issue_writing: false # disables auto issue creation
         - name: Stop Flask app
           if: always()
