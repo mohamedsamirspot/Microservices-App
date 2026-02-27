@@ -160,6 +160,7 @@ jobs:
             target: 'http://localhost:5000/products'
             fail_action: false
             allow_issue_writing: false # disables auto issue creation
+            artifact_name: ''
         - name: Fix workspace permissions for ZAP (second scan)
           run: chmod a+w ${{ github.workspace }}
         - name: Run ZAP Scan on /users
@@ -168,6 +169,7 @@ jobs:
             target: 'http://localhost:5000/users'
             fail_action: false
             allow_issue_writing: false # disables auto issue creation
+            artifact_name: ''
         - name: Stop Flask app
           if: always()
           run: docker stop flask-app && docker rm flask-app
