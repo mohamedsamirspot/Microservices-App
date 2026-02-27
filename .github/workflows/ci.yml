@@ -81,7 +81,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: sonarqube-check
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Determine Docker image tag
@@ -119,16 +120,14 @@ jobs:
       needs: build-and-trivy-scan-container-image
       if: github.event_name != 'pull_request'
       steps:
-        - uses: actions/checkout@v6
-
+        - name: Checkout
+          uses: actions/checkout@v6
         - name: Download image TAR
-          uses: actions/download-artifact@v8
+          uses: actions/download-artifact@v7
           with:
             name: docker-image
-
         - name: Load image
           run: docker load -i image.tar
-
         - name: Determine Docker image tag
           id: version
           run: |
@@ -138,20 +137,19 @@ jobs:
               BRANCH_NAME=${GITHUB_REF##*/}
               echo "TAG=${BRANCH_NAME}-${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
             fi
-
         - name: Run Flask app
           run: |
             docker run -d --name flask-app -p 5000:5000 \
               ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.TAG }}
-            sleep 10  # wait for app to be ready
-
+            sleep 10
+        - name: Fix workspace permissions for ZAP
+          run: chmod a+w ${{ github.workspace }}
         - name: Run OWASP ZAP Baseline Scan
           uses: zaproxy/action-baseline@v0.12.0
           with:
             target: 'http://localhost:5000'
-            fail_action: false   # set true to break pipeline on findings
+            fail_action: false  # set true to break pipeline on findings
             artifact_name: zap-report
-
         - name: Stop Flask app
           if: always()
           run: docker stop flask-app && docker rm flask-app
@@ -195,7 +193,8 @@ jobs:
   #   runs-on: ubuntu-latest
   #   needs: sonarqube-check
   #   steps:
-  #     - uses: actions/checkout@v6
+  #     - name: Checkout
+  #       uses: actions/checkout@v6
 
   #     - name: Set up Docker Buildx
   #       uses: docker/setup-buildx-action@v3
