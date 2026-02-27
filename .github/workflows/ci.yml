@@ -155,7 +155,7 @@ jobs:
         - name: Fix workspace permissions for ZAP
           run: chmod a+w ${{ github.workspace }}
         - name: Run ZAP Scan on /products
-          uses: zaproxy/action-baseline@v0.12.0
+          uses: zaproxy/action-baseline@v0.15.0
           continue-on-error: true
           with:
             target: 'http://localhost:5000/products'
