@@ -114,7 +114,7 @@ jobs:
           name: docker-image
           path: image.tar
 
-  #DAST
+  #DAST (it is better to put this job to be after the deployment pipeline but for demo purposes we will run it here right after image build and scan, before pushing to registry. In real life, you would want to deploy the image to a staging environment and run DAST against that environment instead of running it against a local container in the CI runner):
   dast-zap:
       runs-on: ubuntu-latest
       needs: build-and-trivy-scan-container-image
@@ -162,16 +162,16 @@ jobs:
             fail_action: false
             allow_issue_writing: false # disables auto issue creation
             artifact_name: ''
-        - name: Fix workspace permissions for ZAP (second scan)
-          run: chmod a+w ${{ github.workspace }}
-        - name: Run ZAP Scan on /users
-          uses: zaproxy/action-baseline@v0.12.0
-          continue-on-error: true
-          with:
-            target: 'http://localhost:5000/users'
-            fail_action: false
-            allow_issue_writing: false # disables auto issue creation
-            artifact_name: ''
+        # - name: Fix workspace permissions for ZAP (second scan)
+        #   run: chmod a+w ${{ github.workspace }}
+        # - name: Run ZAP Scan on /users
+        #   uses: zaproxy/action-baseline@v0.12.0
+        #   continue-on-error: true
+        #   with:
+        #     target: 'http://localhost:5000/users'
+        #     fail_action: false
+        #     allow_issue_writing: false # disables auto issue creation
+        #     artifact_name: ''
         - name: Stop Flask app
           if: always()
           run: docker stop flask-app && docker rm flask-app
