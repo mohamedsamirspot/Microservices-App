@@ -82,7 +82,7 @@ jobs:
     continue-on-error: true
     steps:
       - name: Semgrep Scan
-      - uses: mohamedsamirspot/Microservices-Github-Actions/.github/actions/sast-semgrep@main
+        uses: mohamedsamirspot/Microservices-Github-Actions/.github/actions/sast-semgrep@main
 
   #SCA
   build-and-trivy-scan-container-image:
