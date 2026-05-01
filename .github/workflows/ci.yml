@@ -61,7 +61,7 @@ jobs:
   #SAST: Add Bandit (Python-specific) if you can: SonarQube is broad; Bandit is purpose-built for Python security issues (SQL injection, hardcoded secrets, unsafe deserialization, etc.):
   sast-sonarqube-check:
     runs-on: ubuntu-latest
-    needs: trivy-dependency-check
+    needs: sca-trivy-dependency-check
     continue-on-error: true
     steps:
       - uses: actions/checkout@v6
@@ -78,7 +78,7 @@ jobs:
   #SAST
   sast-semgrep-check:
     runs-on: ubuntu-latest
-    needs: trivy-dependency-check
+    needs: sca-trivy-dependency-check
     continue-on-error: true
     steps:
       - name: Semgrep Scan
@@ -88,7 +88,9 @@ jobs:
   build-and-trivy-scan-container-image:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    needs: sonarqube-check
+    needs:
+      - sast-sonarqube-check
+      - sast-semgrep-check
     steps:
       - name: Checkout
         uses: actions/checkout@v6
