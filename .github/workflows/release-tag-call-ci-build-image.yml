@@ -1,4 +1,4 @@
-name: release-tag-call-ci-build-image
+name: release-tag-then-call-ci
 
 on:
   push:
