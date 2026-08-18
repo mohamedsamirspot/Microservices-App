@@ -9,12 +9,12 @@ name: ci
 # ❌ PR events = proposed code → run checks only, no publishing
 # | Event                                                               | Triggers **Release-Tag Workflow**  | Triggers **CI Workflow** | Notes                                                  |
 # | ------------------------------------------------------------------- | ---------------------------------  | ------------------------ | ------------------------------------------------------ |
-# | **Push to any non-`main` branch**                                   | ❌ No                              | ✅ Yes                    | Builds & scans branch images → `v1.440.0-dev`          |
+# | **Push to any non-`main` branch**                                   | ❌ No                              | ✅ Yes                    | Builds & scans branch images → `v1.440.0-branch-name`  |
 # | **Push to `main` branch**                                           | ✅ Yes                             | ❌ No                     | Release workflow bumps version & creates tag           |
 # | **Pull request into any branch**                                    | ❌ No                              | ⚠️ Yes (CI only)         | Runs tests/scans; **no images pushed**                 |
 # | **Merge into `main`**                                               | ✅ Yes                             | ❌ No                     | Release workflow creates Git tag (`vX.Y.Z`)            |
 # | **Git tag pushed (vX.Y.Z)**                                         | ❌ No                              | ✅ Yes                    | Builds **production image** → `vX.Y.Z`, `latest`       |
-# | **Manual run (workflow_dispatch)**                                  | ❌ No                              | ✅ Yes                    | Optional publish for branch image → `v1.440.0-dev`     |
+# | **Manual run (workflow_dispatch)**                                  | ❌ No                              | ✅ Yes                    | Optional publish shared `-dev` tag → `v1.440.0-dev`    |
 # | **Push to any other branch (feature/* etc.)**                       | ❌ No                              | ✅ Yes                    | Builds & scans branch images; publishing stays opt-in  |
 # | **Automatic tag created by release workflow "only in main branch"** | (This workflow creates it)          | ✅ Yes                    | CI runs on tags created by release workflow            |
 
@@ -160,7 +160,11 @@ jobs:
             minor=$((minor + 1))
             patch=0
 
-            tag="v${major}.${minor}.${patch}-dev"
+            # Extract and sanitize branch name for use in tag
+            branch_name="${GITHUB_REF##*/}"
+            branch_name="${branch_name//[^a-zA-Z0-9._-]/-}"
+
+            tag="v${major}.${minor}.${patch}-${branch_name}"
           fi
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
