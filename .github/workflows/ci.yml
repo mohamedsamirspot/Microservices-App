@@ -9,12 +9,12 @@ name: ci
 # ❌ PR events = proposed code → run checks only, no publishing
 # | Event                                                               | Triggers **Release-Tag Workflow**  | Triggers **CI Workflow** | Notes                                                  |
 # | ------------------------------------------------------------------- | ---------------------------------  | ------------------------ | ------------------------------------------------------ |
-# | **Push to any non-`main` branch**                                   | ❌ No                              | ✅ Yes                    | Builds & scans branch images → `1.440.0-dev`           |
+# | **Push to any non-`main` branch**                                   | ❌ No                              | ✅ Yes                    | Builds & scans branch images → `v1.440.0-dev`          |
 # | **Push to `main` branch**                                           | ✅ Yes                             | ❌ No                     | Release workflow bumps version & creates tag           |
 # | **Pull request into any branch**                                    | ❌ No                              | ⚠️ Yes (CI only)         | Runs tests/scans; **no images pushed**                 |
 # | **Merge into `main`**                                               | ✅ Yes                             | ❌ No                     | Release workflow creates Git tag (`vX.Y.Z`)            |
 # | **Git tag pushed (vX.Y.Z)**                                         | ❌ No                              | ✅ Yes                    | Builds **production image** → `vX.Y.Z`, `latest`       |
-# | **Manual run (workflow_dispatch)**                                  | ❌ No                              | ✅ Yes                    | Optional publish for branch image → `1.440.0-dev`      |
+# | **Manual run (workflow_dispatch)**                                  | ❌ No                              | ✅ Yes                    | Optional publish for branch image → `v1.440.0-dev`     |
 # | **Push to any other branch (feature/* etc.)**                       | ❌ No                              | ✅ Yes                    | Builds & scans branch images; publishing stays opt-in  |
 # | **Automatic tag created by release workflow "only in main branch"** | (This workflow creates it)          | ✅ Yes                    | CI runs on tags created by release workflow            |
 
@@ -57,14 +57,43 @@ jobs:
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
+          format: table
+          output: trivy-config.txt
           severity: HIGH,CRITICAL
           ignore-unfixed: true
       - name: Run Trivy FS Scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
+          format: table
+          output: trivy-fs.txt
           severity: HIGH,CRITICAL
           ignore-unfixed: true
+          skip-setup-trivy: true
+      - name: Publish Trivy SCA Summary
+        if: always()
+        shell: bash
+        run: |
+          publish_report() {
+            local title="$1"
+            local report_file="$2"
+
+            if [ -s "$report_file" ]; then
+              {
+                echo "### $title"
+                echo "<details><summary>Click to expand</summary>"
+                echo ""
+                echo '```text'
+                cat "$report_file"
+                echo '```'
+                echo "</details>"
+                echo ""
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
+          }
+
+          publish_report "Trivy Config Scan" trivy-config.txt
+          publish_report "Trivy FS Scan" trivy-fs.txt
 
   #SAST: Add Bandit (Python-specific) if you can: SonarQube is broad; Bandit is purpose-built for Python security issues (SQL injection, hardcoded secrets, unsafe deserialization, etc.):
   sast-sonarqube-check:
@@ -131,7 +160,7 @@ jobs:
             minor=$((minor + 1))
             patch=0
 
-            tag="${major}.${minor}.${patch}-dev"
+            tag="v${major}.${minor}.${patch}-dev"
           fi
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
@@ -143,8 +172,26 @@ jobs:
         with:
           image-ref: ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }}
           scan-type: image
+          format: table
+          output: trivy-image.txt
           severity: HIGH,CRITICAL
           ignore-unfixed: true
+      - name: Publish Trivy Image Summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -s trivy-image.txt ]; then
+            {
+              echo "### Trivy Image Scan"
+              echo "<details><summary>Click to expand</summary>"
+              echo ""
+              echo '```text'
+              cat trivy-image.txt
+              echo '```'
+              echo "</details>"
+              echo ""
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Save image
         run: docker save $IMAGE_NAME:${{ steps.version.outputs.tag }} -o image.tar
       - name: Upload TAR artifact
