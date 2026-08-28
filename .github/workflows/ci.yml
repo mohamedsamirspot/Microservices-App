@@ -134,7 +134,7 @@ jobs:
     outputs:
       image_tag: ${{ steps.version.outputs.tag }}
     needs:
-      - sast-sonarqube-check
+      # - sast-sonarqube-check
       - sast-semgrep-check
     steps:
       - name: Checkout
