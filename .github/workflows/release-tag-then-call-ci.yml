@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      new_tag: ${{ steps.release.outputs.new_tag }}
 
     steps:
       - name: Run release action
@@ -18,13 +20,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Trigger CI via repository dispatch
-        if: steps.release.outputs.new_tag != ''
-        uses: peter-evans/repository-dispatch@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          event-type: release-created
-          client-payload: |
-            {
-              "tag": "${{ steps.release.outputs.new_tag }}"
-            }
+  call-ci:
+    needs: release-tag
+    if: needs.release-tag.outputs.new_tag != ''
+    uses: ./.github/workflows/ci.yml
+    with:
+      tag: ${{ needs.release-tag.outputs.new_tag }}
+    secrets: inherit

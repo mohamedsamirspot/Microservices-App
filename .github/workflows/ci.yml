@@ -20,8 +20,12 @@ name: ci
 
 
 on:
-  repository_dispatch:
-    types: [ release-created ]
+  workflow_call:
+    inputs:
+      tag:
+        description: "Semantic version tag created by the release workflow"
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       publish_dev_image:
@@ -31,7 +35,7 @@ on:
         type: boolean
   # Direct pushes to main do not run this workflow from the push trigger.
   # Main goes through release-tag-then-call-ci.yml, which creates the release tag
-  # and then invokes this workflow via repository_dispatch.
+  # and then calls this workflow directly as a reusable workflow.
   push:
     branches-ignore: [ main ]
   pull_request:
@@ -143,9 +147,9 @@ jobs:
         id: version
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_call" ]; then
             # Release triggered by release-tag workflow → semantic tag
-            tag="${{ github.event.client_payload.tag }}"
+            tag="${{ inputs.tag }}"
           else
             git fetch --force --tags origin
 
@@ -258,7 +262,7 @@ jobs:
           run: docker stop flask-app && docker rm flask-app
 
   push-container-image:
-    if: github.event_name == 'repository_dispatch' || (github.event_name == 'workflow_dispatch' && inputs.publish_dev_image)
+    if: github.event_name == 'workflow_call' || (github.event_name == 'workflow_dispatch' && inputs.publish_dev_image)
     runs-on: ubuntu-latest
     needs:
       - build-and-trivy-scan-container-image
