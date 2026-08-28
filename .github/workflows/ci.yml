@@ -207,6 +207,7 @@ jobs:
         with:
           name: docker-image
           path: image.tar
+          retention-days: 1
 
   #DAST (it is better to put this job to be after the deployment pipeline but for demo purposes we will run it here right after image build and scan, before pushing to registry. In real life, you would want to deploy the image to a staging environment and run DAST against that environment instead of running it against a local container in the CI runner):
   dast-zap:
