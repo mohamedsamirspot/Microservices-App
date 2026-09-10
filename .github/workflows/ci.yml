@@ -14,7 +14,7 @@ name: ci
 # | **Pull request into any branch**                                    | ❌ No                              | ⚠️ Yes (CI only)         | Runs tests/scans; **no images pushed**                 |
 # | **Merge into `main`**                                               | ✅ Yes                             | ❌ No                     | Release workflow creates Git tag (`vX.Y.Z`)            |
 # | **Git tag pushed (vX.Y.Z)**                                         | ❌ No                              | ✅ Yes                    | Builds **production image** → `vX.Y.Z`, `latest`       |
-# | **Manual run (workflow_dispatch)**                                  | ❌ No                              | ✅ Yes                    | Optional publish shared `-dev` tag → `v1.440.0-dev`    |
+# | **Manual run (workflow_dispatch)**                                  | ❌ No                              | ✅ Yes                    | Optional publish branch image/chart → `v1.440.0-branch-name` / `1.440.0-branch-name` |
 # | **Push to any other branch (feature/* etc.)**                       | ❌ No                              | ✅ Yes                    | Builds & scans branch images; publishing stays opt-in  |
 # | **Automatic tag created by release workflow "only in main branch"** | (This workflow creates it)          | ✅ Yes                    | CI runs on tags created by release workflow            |
 
@@ -29,7 +29,7 @@ on:
   workflow_dispatch:
     inputs:
       publish_dev_image:
-        description: "Push the branch build as the shared -dev image tag"
+        description: "Push the current branch image and Helm chart with branch-suffixed versions"
         required: false
         default: false
         type: boolean
@@ -46,8 +46,17 @@ concurrency:
   # the default is wait
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  packages: write
+
 env:
-  IMAGE_NAME: mohamedsamirebrahim/microservices-python-image
+  IMAGE_NAME: ghcr.io/mohamedsamirspot/microservices-app
+  HELM_REGISTRY: ghcr.io
+  HELM_CHART_NAME: microservices-app
+  HELM_CHART_OCI_REPOSITORY: ghcr.io/mohamedsamirspot
+  HELM_CHART_PATH: charts/microservices
+  GITOPS_REPO: mohamedsamirspot/Microservices-K8s-Manifests
 
 jobs:
   #SCA: Strengthen with Snyk or pip-audit if you can: Trivy FS is good but adding a Python-specific tool catches more
@@ -133,6 +142,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.version.outputs.tag }}
+      chart_version: ${{ steps.version.outputs.chart_version }}
     needs:
       # - sast-sonarqube-check
       - sast-semgrep-check
@@ -150,6 +160,7 @@ jobs:
           if [ -n "${{ inputs.tag }}" ]; then
             # Release triggered by release-tag workflow → semantic tag
             tag="${{ inputs.tag }}"
+            chart_version="${tag#v}"
           else
             git fetch --force --tags origin
 
@@ -163,15 +174,18 @@ jobs:
 
             minor=$((minor + 1))
             patch=0
+            release_version="${major}.${minor}.${patch}"
 
             # Extract and sanitize branch name for use in tag
-            branch_name="${GITHUB_REF##*/}"
-            branch_name="${branch_name//[^a-zA-Z0-9._-]/-}"
+            raw_branch_name="${GITHUB_REF_NAME:-${GITHUB_REF#refs/heads/}}"
+            branch_name="$(printf '%s' "$raw_branch_name" | tr '[:upper:]' '[:lower:]' | sed -E 's#[^a-z0-9]+#-#g; s#^-+##; s#-+$##')"
 
-            tag="v${major}.${minor}.${patch}-${branch_name}"
+            tag="v${release_version}-${branch_name}"
+            chart_version="${release_version}-${branch_name}"
           fi
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "chart_version=$chart_version" >> "$GITHUB_OUTPUT"
       - name: Build Docker image
         run: |
           docker build -t $IMAGE_NAME:${{ steps.version.outputs.tag }} .
@@ -275,14 +289,186 @@ jobs:
           name: docker-image
       - name: Load image
         run: docker load -i image.tar
-      - name: Login to DockerHub
+      - name: Login to GHCR
         uses: docker/login-action@v4
         with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Push image
         run: |
           docker push $IMAGE_NAME:${{ needs.build-and-trivy-scan-container-image.outputs.image_tag }}
+
+  publish-helm-chart:
+    if: inputs.tag != '' || (github.event_name == 'workflow_dispatch' && inputs.publish_dev_image)
+    runs-on: ubuntu-latest
+    needs:
+      - build-and-trivy-scan-container-image
+      - push-container-image
+    outputs:
+      chart_version: ${{ steps.version.outputs.chart_version }}
+      app_version: ${{ steps.version.outputs.app_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Helm
+        uses: azure/setup-helm@v5
+      - name: Resolve chart version
+        id: version
+        shell: bash
+        run: |
+          app_version="${{ needs.build-and-trivy-scan-container-image.outputs.image_tag }}"
+          chart_version="${{ needs.build-and-trivy-scan-container-image.outputs.chart_version }}"
+
+          echo "app_version=$app_version" >> "$GITHUB_OUTPUT"
+          echo "chart_version=$chart_version" >> "$GITHUB_OUTPUT"
+      - name: Lint Helm chart
+        run: helm lint "$HELM_CHART_PATH"
+      - name: Package Helm chart
+        run: |
+          mkdir -p dist/charts
+          helm package "$HELM_CHART_PATH" \
+            --version "${{ steps.version.outputs.chart_version }}" \
+            --app-version "${{ steps.version.outputs.app_version }}" \
+            --destination dist/charts
+      - name: Login to Helm OCI registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login "$HELM_REGISTRY" --username "${{ github.actor }}" --password-stdin
+      - name: Push Helm chart
+        run: helm push "dist/charts/$HELM_CHART_NAME-${{ steps.version.outputs.chart_version }}.tgz" "oci://$HELM_CHART_OCI_REPOSITORY"
+
+  promote-dev-chart:
+    if: inputs.tag != ''
+    runs-on: ubuntu-latest
+    needs: publish-helm-chart
+    steps:
+      - name: Generate GitOps app token
+        id: gitops-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id:: ${{ vars.GITOPS_APP_ID }}
+          private-key: ${{ secrets.GITOPS_APP_PRIVATE_KEY }}
+          owner: mohamedsamirspot
+          repositories: Microservices-K8s-Manifests
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ env.GITOPS_REPO }}
+          token: ${{ steps.gitops-token.outputs.token }}
+          path: gitops
+      - name: Promote chart to dev
+        working-directory: gitops
+        env:
+          CHART_VERSION: ${{ needs.publish-helm-chart.outputs.chart_version }}
+          APP_FILE: root/10-apps/microservices-dev.yaml
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          app_file = Path(os.environ["APP_FILE"])
+          chart_version = os.environ["CHART_VERSION"]
+          content = app_file.read_text()
+          lines = content.splitlines()
+
+          for index, line in enumerate(lines):
+              if line.strip().startswith("targetRevision:"):
+                  indent = line[:len(line) - len(line.lstrip())]
+                  lines[index] = f"{indent}targetRevision: {chart_version}"
+                  break
+          else:
+              raise SystemExit(f"targetRevision not found in {app_file}")
+
+          app_file.write_text("\n".join(lines) + "\n")
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet; then
+            echo "Dev already points to chart $CHART_VERSION"
+            exit 0
+          fi
+
+          git add "$APP_FILE"
+          git commit -m "chore: promote microservices chart $CHART_VERSION to dev [skip ci]"
+          git push
+
+  promote-prod-chart-pr:
+    if: inputs.tag != ''
+    runs-on: ubuntu-latest
+    needs: publish-helm-chart
+    steps:
+      - name: Generate GitOps app token
+        id: gitops-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GITOPS_APP_ID }}
+          private-key: ${{ secrets.GITOPS_APP_PRIVATE_KEY }}
+          owner: mohamedsamirspot
+          repositories: Microservices-K8s-Manifests
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ env.GITOPS_REPO }}
+          token: ${{ steps.gitops-token.outputs.token }}
+          path: gitops
+      - name: Open prod promotion PR
+        working-directory: gitops
+        env:
+          GH_TOKEN: ${{ steps.gitops-token.outputs.token }}
+          CHART_VERSION: ${{ needs.publish-helm-chart.outputs.chart_version }}
+          APP_VERSION: ${{ needs.publish-helm-chart.outputs.app_version }}
+          APP_FILE: root/10-apps/microservices-prod.yaml
+        shell: bash
+        run: |
+          branch="promote/microservices-$CHART_VERSION"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin "$branch" || true
+          if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+            git switch -c "$branch" --track "origin/$branch"
+          else
+            git switch -c "$branch"
+          fi
+
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          app_file = Path(os.environ["APP_FILE"])
+          chart_version = os.environ["CHART_VERSION"]
+          content = app_file.read_text()
+          lines = content.splitlines()
+
+          for index, line in enumerate(lines):
+              if line.strip().startswith("targetRevision:"):
+                  indent = line[:len(line) - len(line.lstrip())]
+                  lines[index] = f"{indent}targetRevision: {chart_version}"
+                  break
+          else:
+              raise SystemExit(f"targetRevision not found in {app_file}")
+
+          app_file.write_text("\n".join(lines) + "\n")
+          PY
+
+          if git diff --quiet; then
+            echo "Prod promotion branch already points to chart $CHART_VERSION"
+          else
+            git add "$APP_FILE"
+            git commit -m "chore: promote microservices chart $CHART_VERSION to prod [skip ci]"
+            git push --set-upstream origin "$branch" --force-with-lease
+          fi
+
+          gh pr view "$branch" --repo "$GITOPS_REPO" >/dev/null 2>&1 || \
+            gh pr create \
+              --repo "$GITOPS_REPO" \
+              --base main \
+              --head "$branch" \
+              --title "Promote microservices $APP_VERSION to prod" \
+              --body "Promotes the microservices Helm chart to version $CHART_VERSION, which deploys image $APP_VERSION."
 
 #------------------ Multi-Arch Docker Buildx Reference ------------------#
 # Docker does not support saving a multi-arch image as a single TAR and re-loading it later so you have to build again in the push step.
