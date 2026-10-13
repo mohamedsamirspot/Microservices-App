@@ -1,4 +1,4 @@
-FROM python:3.14-slim
+FROM python:3.15-slim
 
 # Create non-root user with fixed UID/GID
 RUN groupadd -g 1001 microservices-user \
