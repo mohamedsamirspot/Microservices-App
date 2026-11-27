@@ -4,6 +4,13 @@ app:
   replicaCount: 1
   image:
     repository: ghcr.io/mohamedsamirspot/microservices-app
+  nodeSelector:
+    workload: apps
+  tolerations:
+    - key: workload
+      operator: Equal
+      value: apps
+      effect: NoSchedule
   resources:
     limits:
       cpu: 100m

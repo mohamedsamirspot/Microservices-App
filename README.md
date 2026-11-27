@@ -33,6 +33,14 @@ The workflow expects a GitHub App installed on the GitOps repo, with these value
 
 The app needs `Contents: Read and write` and `Pull requests: Read and write` permissions on `mohamedsamirspot/Microservices-K8s-Manifests`.
 
+## Kubernetes workload placement
+
+The Helm chart schedules the application Deployment onto the dedicated
+Karpenter application NodePool by default. It selects nodes labelled
+`workload=apps` and tolerates the matching `workload=apps:NoSchedule` taint.
+Platform tools remain on the infrastructure repository's shared Karpenter
+NodePool.
+
 ### Gitlab
 ![Image Description](screenshots/2.png)
 ### Github Actions
