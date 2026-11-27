@@ -26,6 +26,14 @@ spec:
         runAsGroup: 1001
         fsGroup: 1001
         runAsNonRoot: true
+      {{- with .Values.app.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.app.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: microservices-container
           image: {{ .Values.app.image.repository }}:{{ .Chart.AppVersion }}
